@@ -4,8 +4,6 @@ import os
 import json
 from bs4 import BeautifulSoup
 import requests
-from playwright.sync_api import sync_playwright
-from playwright_stealth import stealth_sync
 
 def scrape_wechat(url):
     """Scrapes WeChat article content and images."""

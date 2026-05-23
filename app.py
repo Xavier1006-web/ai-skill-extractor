@@ -2,7 +2,7 @@ import streamlit as st
 import json
 import os
 import re
-from scraper import scrape_wechat, scrape_dynamic, scrape_xiaohongshu
+from scraper import scrape_wechat, scrape_xiaohongshu
 from skill_extractor import extract_skills_from_text
 from installer import install_skill
 
@@ -65,8 +65,8 @@ if st.button("Extract Skills", type="primary"):
                 scrape_result = scrape_xiaohongshu(url)
                 scrape_result['platform'] = 'xiaohongshu'
             else:
-                scrape_result = scrape_dynamic(url)
-                scrape_result['platform'] = 'dynamic'
+                scrape_result = {'error': 'Unsupported URL format. Please enter a Xiaohongshu or WeChat Official Account link.'}
+                scrape_result['platform'] = 'unsupported'
             
         if 'error' in scrape_result:
             st.error(f"Scraping failed: {scrape_result['error']}")
