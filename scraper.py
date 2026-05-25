@@ -86,7 +86,7 @@ DEFAULT_UA = (
     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/120.0.0.0"
 )
 
-def scrape_xiaohongshu(url: str):
+def scrape_xiaohongshu(url: str, cookie: str = None):
     """Scrapes Xiaohongshu without Playwright using the fast JSON brace matcher."""
     extracted_data = {
         'title': '',
@@ -94,14 +94,27 @@ def scrape_xiaohongshu(url: str):
         'images': []
     }
     try:
-        resp = requests.get(url, allow_redirects=True, timeout=20, headers={"User-Agent": DEFAULT_UA})
+        headers = {"User-Agent": DEFAULT_UA}
+        if cookie:
+            # Strip any surrounding quotes/whitespace from cookie
+            cookie = cookie.strip().strip('"').strip("'")
+            headers["Cookie"] = cookie
+            
+        resp = requests.get(url, allow_redirects=True, timeout=20, headers=headers)
         resp.raise_for_status()
         html = resp.text
         
+        # Check if the page is a known block / safety verification page
+        if "你访问的页面不见了" in html or "访问受限" in html or "验证" in html or "captcha" in html.lower():
+            if not cookie:
+                raise Exception("被小紅書防爬蟲攔截（提示：頁面不見了/訪問受限）。這是因為雲端伺服器 IP 被限制，請在側邊欄配置您的「小紅書 Cookie」以繞過此限制。")
+            else:
+                raise Exception("被小紅書防爬蟲攔截。這通常意味著您配置的「小紅書 Cookie」可能已經失效或輸入格式不正確，請在瀏覽器重新獲取並更新 Cookie。")
+                
         marker = "window.__INITIAL_STATE__="
         idx = html.find(marker)
         if idx == -1:
-            raise Exception("window.__INITIAL_STATE__ not found. Page might be blocked.")
+            raise Exception("未找到 window.__INITIAL_STATE__。小紅書可能更新了網頁結構，或者該請求被完全攔截。")
             
         start = idx + len(marker)
         raw = _brace_match_json(html, start)
@@ -110,14 +123,23 @@ def scrape_xiaohongshu(url: str):
         state = json.loads(raw)
         
         note_map = state.get("note", {}).get("noteDetailMap", {})
-        if not note_map:
-            raise Exception("noteDetailMap not found in initial state.")
+        if not note_map or list(note_map.keys()) == ['null'] or next(iter(note_map.values())) is None:
+            if not cookie:
+                raise Exception("小紅書返回了空的筆記內容（防爬蟲限流）。請在側邊欄貼上您的「小紅書 Cookie」即可正常抓取完整圖文和內容！")
+            else:
+                raise Exception("小紅書返回了空的筆記內容。這通常意味著您的 Cookie 已經過期，請重新登入網頁版獲取最新的 Cookie。")
             
         note_id, note_entry = next(iter(note_map.items()))
         note = (note_entry or {}).get("note", {}) or {}
         
-        extracted_data['title'] = note.get("title", "")
-        extracted_data['content'] = note.get("desc", "")
+        title = note.get("title", "")
+        desc = note.get("desc", "")
+        
+        if not title and not desc:
+            raise Exception("成功解析網頁，但該貼文標題與內容皆為空。該貼文可能已被刪除、設為私密或限制訪問。")
+            
+        extracted_data['title'] = title
+        extracted_data['content'] = desc
         
         images_list = note.get("imageList", [])
         image_urls = []
@@ -147,7 +169,7 @@ def scrape_xiaohongshu(url: str):
                 
         return extracted_data
     except Exception as e:
-        extracted_data['error'] = f"Error scraping Xiaohongshu API: {e}"
+        extracted_data['error'] = f"抓取小紅書失敗: {e}"
         return extracted_data
 
 def scrape_dynamic(url):

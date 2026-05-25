@@ -9,6 +9,7 @@ from installer import install_skill
 st.set_page_config(page_title="AI Skill Extractor", page_icon="🤖", layout="wide")
 
 CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.txt")
+XHS_COOKIE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "xhs_cookie.txt")
 
 def load_key():
     if os.path.exists(CONFIG_FILE):
@@ -19,6 +20,16 @@ def load_key():
 def save_key(key):
     with open(CONFIG_FILE, "w") as f:
         f.write(key.strip())
+
+def load_xhs_cookie():
+    if os.path.exists(XHS_COOKIE_FILE):
+        with open(XHS_COOKIE_FILE, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    return ""
+
+def save_xhs_cookie(cookie):
+    with open(XHS_COOKIE_FILE, "w", encoding="utf-8") as f:
+        f.write(cookie.strip())
 
 st.title("🤖 AI Skill Extractor")
 st.markdown("Extract, evaluate, and install AI `.md` skills from Xiaohongshu notes/videos and WeChat articles.")
@@ -34,6 +45,29 @@ with st.sidebar:
         
     if not api_key:
         st.warning("Please enter your Gemini API Key to continue.")
+        
+    st.markdown("---")
+    st.header("Xiaohongshu Settings")
+    saved_cookie = load_xhs_cookie()
+    xhs_cookie = st.text_area(
+        "Xiaohongshu Cookie (Optional)", 
+        value=saved_cookie, 
+        height=100, 
+        help="Paste your Xiaohongshu browser Cookie to bypass anti-scraping blocks. Highly recommended for cloud deployment."
+    )
+    
+    if xhs_cookie != saved_cookie:
+        save_xhs_cookie(xhs_cookie)
+        
+    with st.expander("🍪 如何獲取小紅書 Cookie？"):
+        st.markdown("""
+        1. 在電腦瀏覽器打開並登入 [小紅書網頁版](https://www.xiaohongshu.com)
+        2. 按下 **F12** (或按右鍵點擊「檢查」) 打開開發者工具
+        3. 切換到 **Network** (網路) 標籤頁，然後按 **F5** 重新整理網頁
+        4. 點擊 Name 列表裡的第一個請求 (通常是 `explore` 或數字)
+        5. 在右側面板點擊 **Headers** (標頭) -> 滾動到 **Request Headers** (請求標頭)
+        6. 找到 **Cookie**，複製其右側的整段長字串 (以 `a1=...` 開頭)，貼到上方輸入框即可！
+        """)
         
     st.markdown("---")
     st.markdown("""
@@ -62,7 +96,7 @@ if st.button("Extract Skills", type="primary"):
                 scrape_result = scrape_wechat(url)
                 scrape_result['platform'] = 'wechat'
             elif 'xiaohongshu.com' in url or 'xhslink.com' in url:
-                scrape_result = scrape_xiaohongshu(url)
+                scrape_result = scrape_xiaohongshu(url, cookie=xhs_cookie)
                 scrape_result['platform'] = 'xiaohongshu'
             else:
                 scrape_result = {'error': 'Unsupported URL format. Please enter a Xiaohongshu or WeChat Official Account link.'}

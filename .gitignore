@@ -5,4 +5,5 @@ __pycache__/
 temp_images/
 installed_skills/
 config.txt
+xhs_cookie.txt
 .env
